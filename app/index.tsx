@@ -44,6 +44,7 @@ export default function Home() {
   // Autocompletado
   const [suggestions, setSuggestions] = useState<{ id: number; name: string }[]>([]);
   const [showSug, setShowSug] = useState(false);
+  const [suggestEnabled, setSuggestEnabled] = useState(true); // ⬅️ NUEVO: habilita/inhabilita el autocompletado
   const sugLimit = 6;
   const inputRef = useRef<TextInput>(null);
 
@@ -62,8 +63,8 @@ export default function Home() {
         q: term,
         cat: cat === 'Todos' ? null : cat,
         only_open: false,
-        user_lat: null,           // ← sin ubicación
-        user_lng: null,           // ← sin ubicación
+        user_lat: null,
+        user_lng: null,
         limit_: limit,
         offset_: offset,
         city_filter: city === 'Todas' ? null : city,
@@ -98,40 +99,65 @@ export default function Home() {
     }
   }, [qd]);
 
-  // Autocompletado
+  // Autocompletado (solo si está habilitado)
   useEffect(() => {
     let alive = true;
     const term = qd?.trim() ?? '';
-    if (term.length < 2) { setSuggestions([]); setShowSug(false); return; }
+
+    // si autocompletado está deshabilitado o menos de 2 letras, no hacemos nada
+    if (!suggestEnabled || term.length < 2) {
+      setSuggestions([]);
+      setShowSug(false);
+      return;
+    }
+
     (async () => {
       try {
         const { data, error } = await supabase.rpc('search_restaurants', {
           q: term,
           cat: cat === 'Todos' ? null : cat,
           only_open: false,
-          user_lat: null,           // ← sin ubicación
-          user_lng: null,           // ← sin ubicación
+          user_lat: null,
+          user_lng: null,
           limit_: sugLimit,
           offset_: 0,
           city_filter: city === 'Todas' ? null : city,
         });
         if (error) throw error;
         const slim = (data || []).map((r: any) => ({ id: r.id, name: r.name }));
-        if (alive) { setSuggestions(slim); setShowSug(slim.length > 0); }
-      } catch { if (alive) { setSuggestions([]); setShowSug(false); } }
+        if (alive) {
+          setSuggestions(slim);
+          setShowSug(slim.length > 0);
+        }
+      } catch {
+        if (alive) {
+          setSuggestions([]);
+          setShowSug(false);
+        }
+      }
     })();
+
     return () => { alive = false; };
-  }, [qd, cat, city]);
+  }, [qd, cat, city, suggestEnabled]);
 
   function applySuggestion(s: { id: number; name: string }) {
+    // 1) fijamos el texto con la sugerencia
     setQ(s.name);
+    // 2) cerramos y deshabilitamos autocompletado para que NO vuelva a cargar
     closeSuggestions();
+    setSuggestEnabled(false);
+    // 3) cerramos teclado
     Keyboard.dismiss();
+    inputRef.current?.blur();
+    // 4) lanzamos la búsqueda principal (una sola vez)
     fetchPage(true);
   }
+
   function onSearchPress() {
     closeSuggestions();
+    setSuggestEnabled(false); // si el usuario pulsa "buscar", también deshabilitamos hasta nueva edición
     Keyboard.dismiss();
+    inputRef.current?.blur();
     fetchPage(true);
   }
 
@@ -145,12 +171,29 @@ export default function Home() {
           ref={inputRef}
           placeholder="Buscar restaurantes, pizzerías…"
           value={q}
-          onChangeText={(t) => { setQ(t); setShowSug(true); }}
-          onFocus={() => setShowSug(suggestions.length > 0)}
+          onChangeText={(t) => {
+            setQ(t);
+            // el usuario está editando → reactivamos autocompletado
+            setSuggestEnabled(true);
+            // mostrar sugerencias solo si hay 2+ letras
+            setShowSug((t.trim().length >= 2) && suggestions.length > 0);
+            // si se borra todo → cerrar teclado y sugerencias
+            if (t.trim().length === 0) {
+              closeSuggestions();
+              Keyboard.dismiss();
+              inputRef.current?.blur();
+            }
+          }}
+          onFocus={() => {
+            // al enfocar, si había sido deshabilitado por selección previa, lo reactivamos
+            setSuggestEnabled(true);
+            setShowSug(suggestions.length > 0 && (q.trim().length >= 2));
+          }}
           onBlur={() => setTimeout(closeSuggestions, 0)}
           style={styles.input}
           returnKeyType="search"
           onSubmitEditing={onSearchPress}
+          clearButtonMode="while-editing"
         />
         {showSug && suggestions.length > 0 && (
           <View style={styles.suggestBox}>
@@ -193,8 +236,21 @@ export default function Home() {
           onEndReached={() => { if (!loading && hasMore && rows.length > 0) fetchPage(false); }}
           onEndReachedThreshold={0.7}
           renderItem={({ item }) => (
-            <Link href={{ pathname: '/restaurant/[id]', params: { id: String(item.id) } }} asChild>
-              <Pressable><RestaurantCard item={item} /></Pressable>
+            <Link
+              href={{ pathname: '/restaurant/[id]', params: { id: String(item.id) } }}
+              asChild
+            >
+              <Pressable
+                android_ripple={{ color: '#E9ECEF' }}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.96 : 1,
+                  borderRadius: 16,
+                })}
+              >
+                {({ pressed }) => (
+                  <RestaurantCard item={item} pressed={pressed} />
+                )}
+              </Pressable>
             </Link>
           )}
           ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyText}>No hay resultados.</Text></View>}

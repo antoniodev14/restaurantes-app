@@ -20,14 +20,23 @@ export function CitySelect({
   useEffect(() => {
     let alive = true;
     (async () => {
+      // city ahora es text[] -> traemos y aplanamos
       const { data, error } = await supabase
         .from('restaurants')
-        .select('city')
-        .neq('city', null)
-        .order('city', { ascending: true });
+        .select('city') // city: text[]
+        .not('city', 'is', null);
 
       if (!error) {
-        const unique = Array.from(new Set((data || []).map((r:any)=> r.city))).filter(Boolean);
+        const all: string[] = (data || []).flatMap((r: any) => {
+          const c = r.city;
+          if (Array.isArray(c)) return c.filter(Boolean);
+          if (typeof c === 'string' && c.trim()) return [c.trim()];
+          return [];
+        });
+        const unique = Array.from(new Set(all))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
         if (alive) setOptions(['Todas', ...unique]);
       }
     })();
