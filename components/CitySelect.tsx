@@ -1,42 +1,27 @@
 // components/CitySelect.tsx
 import { useEffect, useState } from 'react';
-import {
-  FlatList,
-  Modal,
-  Platform,
-  Pressable,
-  Text,
-  View
-} from 'react-native';
+import { FlatList, Modal, Platform, Pressable, Text, View } from 'react-native';
+import { Colors } from '../constants/Colors';
 import { supabase } from '../libs/superbase';
 
-export function CitySelect({
-  value, onChange, label = 'Ciudad', fullWidth = false
-}: { value: string; onChange: (v:string)=>void; label?: string; fullWidth?: boolean }) {
-
+export function CitySelect({ value, onChange, label = 'Ciudad', fullWidth = false }:{
+  value: string; onChange:(v:string)=>void; label?: string; fullWidth?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<string[]>(['Todas']);
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      // city ahora es text[] -> traemos y aplanamos
-      const { data, error } = await supabase
-        .from('restaurants')
-        .select('city') // city: text[]
-        .not('city', 'is', null);
-
+      const { data, error } = await supabase.from('restaurants').select('city').not('city','is',null);
       if (!error) {
-        const all: string[] = (data || []).flatMap((r: any) => {
+        const all: string[] = (data || []).flatMap((r:any)=>{
           const c = r.city;
           if (Array.isArray(c)) return c.filter(Boolean);
           if (typeof c === 'string' && c.trim()) return [c.trim()];
           return [];
         });
-        const unique = Array.from(new Set(all))
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-
+        const unique = Array.from(new Set(all)).filter(Boolean).sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
         if (alive) setOptions(['Todas', ...unique]);
       }
     })();
@@ -49,46 +34,34 @@ export function CitySelect({
         onPress={() => setOpen(true)}
         style={{
           paddingVertical:12, paddingHorizontal:14,
-          borderWidth:1, borderColor:'#ddd', borderRadius:12,
-          backgroundColor:'#fff',
-          width: fullWidth ? '100%' : undefined
+          borderRadius: 999, backgroundColor: Colors.pillBg,
+          borderWidth: 1, borderColor: 'rgba(107,33,168,0.15)',
+          width: fullWidth ? '100%' : undefined,
         }}
       >
-        <Text>{label}: {value} ▾</Text>
+        <Text style={{ color: Colors.pillText, fontWeight: '800' }}>{label}: {value} ▾</Text>
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={()=>setOpen(false)}>
-        <View
-          style={{
-            flex:1, backgroundColor:'#0006',
-            justifyContent:'center', alignItems:'center', padding:16
-          }}
-        >
+        <View style={{ flex:1, backgroundColor:'#0006', justifyContent:'center', alignItems:'center', padding:16 }}>
           <Pressable onPress={()=>setOpen(false)} style={{ position:'absolute', inset:0 }} />
-
-          <View
-            style={{
-              width:'90%', maxWidth: 520, maxHeight:'70%',
-              backgroundColor:'#fff', borderRadius:16,
-              paddingVertical:12, paddingHorizontal:12,
-              shadowColor:'#000', shadowOpacity:0.15, shadowRadius:14, elevation: Platform.OS === 'android' ? 6 : 0
-            }}
-          >
-            <Text style={{ fontSize:16, fontWeight:'700', marginBottom:8 }}>
-              Selecciona ciudad
-            </Text>
-
+          <View style={{
+            width:'90%', maxWidth:520, maxHeight:'70%',
+            backgroundColor: Colors.cardBg, borderRadius:18,
+            padding:12, borderWidth:1, borderColor: Colors.border,
+            shadowColor:'#000', shadowOpacity:0.15, shadowRadius:14,
+            elevation: Platform.OS === 'android' ? 6 : 0,
+          }}>
+            <Text style={{ fontSize:16, fontWeight:'900', marginBottom:8, color: Colors.text }}>Selecciona ciudad</Text>
             <FlatList
               data={options}
               keyExtractor={(x)=>x}
-              showsVerticalScrollIndicator
-              ItemSeparatorComponent={()=> <View style={{ height:1, backgroundColor:'#eee' }} />}
+              ItemSeparatorComponent={()=> <View style={{ height:1, backgroundColor: Colors.border }} />}
               renderItem={({item})=>(
                 <Pressable onPress={()=>{ onChange(item); setOpen(false); }} style={{ paddingVertical:12 }}>
-                  <Text>{item}</Text>
+                  <Text style={{ color: Colors.text }}>{item}</Text>
                 </Pressable>
               )}
-              contentContainerStyle={{ paddingBottom:6 }}
             />
           </View>
         </View>
