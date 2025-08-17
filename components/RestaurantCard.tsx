@@ -1,4 +1,5 @@
 // components/RestaurantCard.tsx
+import { Restaurant } from '@/libs/restaurants';
 import { memo, useMemo, useState } from 'react';
 import {
   Image,
@@ -11,17 +12,8 @@ import {
 } from 'react-native';
 import { Colors } from '../constants/Colors';
 
-type RestaurantItem = {
-  id: number | string;
-  name: string;
-  types?: string[];
-  price_range?: string | null;
-  city?: string | string[] | null;
-  image_url?: string | null;
-  is_open?: boolean | null;
-};
 
-type Props = { item: RestaurantItem; pressed?: boolean; };
+type Props = { item: Restaurant; pressed?: boolean; };
 
 const PALETTE = ['#E3F2FD','#E8F5E9','#FFF3E0','#F3E5F5','#E0F7FA','#FCE4EC','#F1F8E9','#EDE7F6'];
 function usePlaceholderColor(name: string) {
