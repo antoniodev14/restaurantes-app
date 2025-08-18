@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome, Ionicons, MaterialCommunityIcons as MIcon } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -145,6 +145,55 @@ export default function RestaurantDetail() {
     Array.isArray(v) ? v.filter(Boolean).join(', ') : (v ?? '') + '';
 
   const typeLabel = useMemo(() => firstOf(data?.types).trim(), [data?.types]);
+
+  // normaliza texto: minúsculas y sin tildes
+  const normalize = (s?: string | null) =>
+    (s ?? '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  // mapping de alérgenos -> icono
+  type IconSpec = { pack: 'ion' | 'mci' | 'fa'; name: string; color?: string };
+
+  const pickAllergenIcon = (raw?: string | null): IconSpec => {
+    const a = normalize(raw);
+
+    // grupos por sinonimias
+    if (/(gluten|trigo|harina|cereal)/.test(a)) return { pack: 'fa', name: 'pagelines', color: '#8A5A44' };
+    if (/(lactosa|leche|lacteos|lácteos)/.test(a)) return { pack: 'mci', name: 'cow', color: '#7C9EFF' };
+    if (/(huevo|huevos)/.test(a)) return { pack: 'ion', name: 'egg-outline', color: '#F1B24A' };
+    if (/(pescado)/.test(a)) return { pack: 'ion', name: 'fish-outline', color: '#4DA3FF' };
+    if (/(marisco|crustaceos|crustáceos)/.test(a)) return { pack: 'mci', name: 'jellyfish', color: '#E36D5B' };
+    if (/(moluscos?)/.test(a)) return { pack: 'fa', name: 'bug', color: '#9B6EFF' };
+
+    if (/(cacahuete|cacahuetes|mani|maní)/.test(a)) return { pack: 'mci', name: 'peanut-outline', color: '#C57A3B' };
+    if (/(frutos?\s*secos|nuez|nueces|almendra|avellana|pistacho|anacardo)/.test(a))
+      return { pack: 'mci', name: 'peanut-outline', color: '#C57A3B' };
+
+    if (/(soja)/.test(a)) return { pack: 'mci', name: 'soy-sauce', color: '#6E8B3D' };    // aproximado
+    if (/(sesamo|sésamo)/.test(a)) return { pack: 'mci', name: 'seed-outline', color: '#6E8B3D' };
+    if (/(apio)/.test(a)) return { pack: 'mci', name: 'sprout', color: '#6E8B3D' };       // aproximado
+    if (/(mostaza)/.test(a)) return { pack: 'mci', name: 'bottle-soda-outline', color: '#D1A500' }; // aproximado
+    if (/(sulfitos?|sulfitos)/.test(a)) return { pack: 'mci', name: 'bottle-wine', color: '#A84B7A' };
+
+    // comodín
+    return { pack: 'ion', name: 'alert-circle-outline', color: '#777' };
+  };
+
+  // mini componente para pintar el icono correcto
+  const AllergenIcon = ({ spec, size = 16 }: { spec: IconSpec; size?: number }) => {
+  switch (spec.pack) {
+    case 'ion':
+      return <Ionicons name={spec.name as any} size={size} color={spec.color || Colors.text} />;
+    case 'mci':
+      return <MIcon name={spec.name as any} size={size} color={spec.color || Colors.text} />;
+    case 'fa':
+      return <FontAwesome name={spec.name as any} size={size} color={spec.color || Colors.text} />;
+    default:
+      return null;
+  }
+};
 
   const bannerUri = useMemo(() => {
     if (!data || bannerError) return undefined;
@@ -483,13 +532,18 @@ export default function RestaurantDetail() {
         <Pressable style={styles.modalBackdrop} onPress={() => setAllergenOpen(false)}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Alérgenos</Text>
+
             {Array.isArray(allergenItem?.allergens) && allergenItem!.allergens!.length > 0 ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-                {allergenItem!.allergens!.map((a, idx) => (
-                  <View key={idx} style={styles.allergenTag}>
-                    <Text style={styles.allergenTagText}>{a}</Text>
-                  </View>
-                ))}
+              <View style={styles.allergenWrap}>
+                {allergenItem!.allergens!.map((a, idx) => {
+                  const spec = pickAllergenIcon(a);
+                  return (
+                    <View key={`${a}-${idx}`} style={styles.allergenChip}>
+                      <AllergenIcon spec={spec} />
+                      <Text style={styles.allergenChipText}>{a}</Text>
+                    </View>
+                  );
+                })}
               </View>
             ) : (
               <Text style={styles.infoText}>Sin información de alérgenos.</Text>
@@ -584,12 +638,31 @@ const styles = StyleSheet.create({
 
   // Modales
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  modalCard: { width: '100%', maxWidth: 420, borderRadius: 16, backgroundColor: '#fff', padding: 16, borderWidth: 1, borderColor: Colors.border },
+  modalCard: { width: '100%', maxWidth: 420, borderRadius: 16, backgroundColor: '#E9D5FF', padding: 16, borderWidth: 1, borderColor: Colors.border },
   modalTitle: { fontSize: 18, fontWeight: '800', color: Colors.text, marginBottom: 10 },
   modalItem: { paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  modalItemText: { fontSize: 16, color: Colors.text },
-  allergenTag: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: '#f1f1f1' },
-  allergenTagText: { color: Colors.text, fontWeight: '600' },
+  modalItemText: { fontSize: 16, color: '#E9D5FF' },
+  allergenWrap: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 10,
+  },
+  allergenChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  allergenChipText: {
+    color: Colors.text,
+    fontWeight: '600',
+  },
 
   // Back
   backBtn: {
