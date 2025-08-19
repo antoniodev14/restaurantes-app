@@ -38,23 +38,23 @@ export function FilterSelect({ value, onChange, label = 'Categoría', fullWidth 
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={()=>setOpen(false)}>
-        <View style={{ flex:1, backgroundColor:'#0006', justifyContent:'center', alignItems:'center', padding:16 }}>
+        <View style={{ flex:1, backgroundColor: "transparent", justifyContent:'center', alignItems:'center', padding:16 }}>
           <Pressable onPress={()=>setOpen(false)} style={{ position:'absolute', inset:0 }} />
           <View style={{
             width:'90%', maxWidth:520, maxHeight:'70%',
-            backgroundColor: Colors.cardBg, borderRadius:18,
+            backgroundColor: Colors.cardFilt, borderRadius:18,
             padding:12, borderWidth:1, borderColor: Colors.border,
             shadowColor:'#000', shadowOpacity:0.15, shadowRadius:14,
             elevation: Platform.OS === 'android' ? 6 : 0,
           }}>
-            <Text style={{ fontSize:16, fontWeight:'900', marginBottom:8, color: Colors.text }}>Selecciona categoría</Text>
+            <Text style={{ fontSize:16, fontWeight:'900', marginBottom:8, color: Colors.textfltro }}>Selecciona categoría</Text>
             <FlatList
               data={options}
               keyExtractor={(x)=>x}
               ItemSeparatorComponent={()=> <View style={{ height:1, backgroundColor: Colors.border }} />}
               renderItem={({item})=>(
                 <Pressable onPress={()=>{ onChange(item); setOpen(false); }} style={{ paddingVertical:12 }}>
-                  <Text style={{ color: Colors.text }}>{item}</Text>
+                  <Text style={{ color: Colors.textfltro }}>{item}</Text>
                 </Pressable>
               )}
             />
