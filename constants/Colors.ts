@@ -12,7 +12,6 @@ export const Colors = {
   // Texto
   text: '#0F172A',
   textDim: 'rgba(15,23,42,0.65)',
-  textfltro: '#6B21A8',
 
   // Inputs translúcidos
   inputBg: 'rgba(255,255,255,0.88)',

@@ -1,71 +1,49 @@
-// components/CitySelect.tsx
-import { useEffect, useState } from 'react';
-import { FlatList, Modal, Platform, Pressable, Text, View } from 'react-native';
-import { Colors } from '../constants/Colors';
+// CitySelect is a wrapper around SelectModal that loads city names from Supabase.
+
 import { supabase } from '../libs/superbase';
+import { SelectModal } from './SelectModal';
 
-export function CitySelect({ value, onChange, label = 'Ciudad', fullWidth = false }:{
-  value: string; onChange:(v:string)=>void; label?: string; fullWidth?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [options, setOptions] = useState<string[]>(['Todas']);
+interface CitySelectProps {
+  value: string;
+  onChange: (v: string) => void;
+  label?: string;
+  fullWidth?: boolean;
+}
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const { data, error } = await supabase.from('restaurants').select('city').not('city','is',null);
-      if (!error) {
-        const all: string[] = (data || []).flatMap((r:any)=>{
-          const c = r.city;
-          if (Array.isArray(c)) return c.filter(Boolean);
-          if (typeof c === 'string' && c.trim()) return [c.trim()];
-          return [];
-        });
-        const unique = Array.from(new Set(all)).filter(Boolean).sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
-        if (alive) setOptions(['Todas', ...unique]);
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
+/**
+ * A drop‑down selector that displays all unique cities present in the restaurants table.
+ * It handles both array and string representations of the `city` column.
+ */
+export function CitySelect({ value, onChange, label = 'Ciudad', fullWidth = false }: CitySelectProps) {
+  const loadCities = async (): Promise<string[]> => {
+    const { data, error } = await supabase
+      .from('restaurants')
+      .select('city')
+      .not('city', 'is', null);
+    if (error) throw error;
+    // Extract city names from the query result. Each row may contain an array
+    // or a single string. Trim and filter out empty values.
+    const all: string[] = (data || []).flatMap((r: any) => {
+      const c = r.city;
+      if (Array.isArray(c)) return c.filter(Boolean);
+      if (typeof c === 'string' && c.trim()) return [c.trim()];
+      return [];
+    });
+    const unique = Array.from(new Set(all))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    return unique;
+  };
 
   return (
-    <View style={{ minWidth: 150 }}>
-      <Pressable
-        onPress={() => setOpen(true)}
-        style={{
-          paddingVertical:12, paddingHorizontal:14,
-          borderRadius: 999, backgroundColor: Colors.pillBg,
-          borderWidth: 1, borderColor: 'rgba(107,33,168,0.15)',
-          width: fullWidth ? '100%' : undefined,
-        }}
-      >
-        <Text style={{ color: Colors.pillText, fontWeight: '800' }}>{label}: {value} ▾</Text>
-      </Pressable>
-
-      <Modal visible={open} transparent animationType="fade" onRequestClose={()=>setOpen(false)}>
-        <View style={{ flex:1, backgroundColor:'transparent', justifyContent:'center', alignItems:'center', padding:16 }}>
-          <Pressable onPress={()=>setOpen(false)} style={{ position:'absolute', inset:0 }} />
-          <View style={{
-            width:'90%', maxWidth:520, maxHeight:'70%',
-            backgroundColor: Colors.cardFilt, borderRadius:18,
-            padding:12, borderWidth:1, borderColor: Colors.border,
-            shadowColor:'#000', shadowOpacity:0.15, shadowRadius:14,
-            elevation: Platform.OS === 'android' ? 6 : 0,
-          }}>
-            <Text style={{ fontSize:16, fontWeight:'900', marginBottom:8, color: Colors.textfltro }}>Selecciona ciudad</Text>
-            <FlatList
-              data={options}
-              keyExtractor={(x)=>x}
-              ItemSeparatorComponent={()=> <View style={{ height:1, backgroundColor: Colors.border }} />}
-              renderItem={({item})=>(
-                <Pressable onPress={()=>{ onChange(item); setOpen(false); }} style={{ paddingVertical:12 }}>
-                  <Text style={{ color: Colors.textfltro }}>{item}</Text>
-                </Pressable>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
-    </View>
+    <SelectModal
+      label={label}
+      value={value}
+      onChange={onChange}
+      loadOptions={loadCities}
+      defaultOption="Todas"
+      fullWidth={fullWidth}
+      selectTitle={`Selecciona ${label.toLowerCase()}`}
+    />
   );
 }
