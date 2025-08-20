@@ -71,6 +71,7 @@ export default function Home() {
   const [loginVisible, setLoginVisible] = useState(false);
   const [loginInput, setLoginInput] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [showWelcomeToast, setShowWelcomeToast] = useState(false);
 
@@ -218,21 +219,29 @@ export default function Home() {
   }
 
   // Authentication handlers
+  function closeLogin() {
+    setLoginVisible(false);
+    setLoginInput('');
+    setPassword('');
+    setPasswordVisible(false);
+    setLoginError(null);
+  }
   async function handleLogin() {
     setLoginError(null);
     try {
       const login = loginInput.trim();
+      const isUsername = !login.includes('@');
       let email = login;
       // If no @, treat as username and look up email in profiles table
-      if (!login.includes('@')) {
+      if (isUsername) {
         const { data: profile, error: profileErr } = await supabase
           .from('profiles')
           .select('email')
-          .eq('username', login)
-          .single();
-        if (profileErr) throw profileErr;
-        if (!profile || !profile.email) {
-          throw new Error('Usuario no encontrado');
+          .ilike('username', login)
+          .limit(1)
+          .maybeSingle();
+        if (profileErr || !profile?.email) {
+          throw new Error('Usuario incorrecto');
         }
         email = profile.email;
       }
@@ -241,6 +250,9 @@ export default function Home() {
         password,
       });
       if (authError || !authData.session) {
+        if (authError?.message === 'Invalid login credentials') {
+          throw new Error(isUsername ? 'Contraseña incorrecta' : 'Correo o contraseña incorrecta');
+        }
         throw authError || new Error('Credenciales inválidas');
       }
       // fetch profile for greeting
@@ -257,9 +269,7 @@ export default function Home() {
         username: prof?.username ?? undefined,
         email: prof?.email ?? authData.user.email,
       });
-      setLoginVisible(false);
-      setLoginInput('');
-      setPassword('');
+      closeLogin();
       // Show welcome toast
       setShowWelcomeToast(true);
       setTimeout(() => setShowWelcomeToast(false), 2000);
@@ -387,12 +397,12 @@ export default function Home() {
           animationType="fade"
           transparent
           statusBarTranslucent
-          onRequestClose={() => setLoginVisible(false)}
+          onRequestClose={closeLogin}
         >
           {/* Overlay background */}
           <Pressable
             style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]}
-            onPress={() => setLoginVisible(false)}
+            onPress={closeLogin}
           />
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -417,10 +427,17 @@ export default function Home() {
                   placeholderTextColor={Colors.textDim}
                   value={password}
                   onChangeText={setPassword}
-                  style={styles.loginInput}
-                  secureTextEntry
+                  style={[styles.loginInput, styles.loginInputPass]}
+                  secureTextEntry={!passwordVisible}
                   autoComplete="password"
                 />
+                <Pressable onPress={() => setPasswordVisible((v) => !v)} style={styles.passwordToggle} hitSlop={10}>
+                  <Ionicons
+                    name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={Colors.textDim}
+                  />
+                </Pressable>
               </View>
               {loginError && <Text style={styles.loginError}>{loginError}</Text>}
               <Pressable onPress={handleLogin} style={styles.loginButton}>
@@ -503,7 +520,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   loginTitle: { fontSize: 20, fontWeight: '800', marginBottom: 16, color: Colors.text },
-  loginInputRow: { marginBottom: 12 },
+  loginInputRow: { marginBottom: 12, position: 'relative' },
   loginInput: {
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -513,6 +530,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.inputBg,
     color: Colors.text,
   },
+  loginInputPass: { paddingRight: 40 },
+  passwordToggle: { position: 'absolute', right: 12, top: 12 },
   loginError: { color: '#dc2626', marginBottom: 12 },
   loginButton: {
     backgroundColor: Colors.primary,
