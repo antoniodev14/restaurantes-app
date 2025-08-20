@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../constants/Colors';
@@ -104,8 +105,27 @@ export function SelectModal({
                   <View style={{ height: 1, backgroundColor: Colors.border,  }} />
                 )}
                 renderItem={({ item }) => (
-                  <Pressable onPress={() => handleSelect(item)} style={{ paddingVertical: 12 }}>
-                    <Text style={{color: Colors.pillText}}>{item}</Text>
+                  <Pressable
+                    onPress={() => handleSelect(item)}
+                    style={{
+                      paddingVertical: 12,
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: item === value ? '800' : '400',
+                        color: Colors.pillText,
+                      }}
+                    >
+                      {item}
+                    </Text>
+                    {item === value && (
+                      <Ionicons name="checkmark" size={20} color={Colors.text} />
+                    )}
                   </Pressable>
                 )}
               />

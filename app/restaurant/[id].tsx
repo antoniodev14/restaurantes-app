@@ -513,7 +513,7 @@ export default function RestaurantDetail() {
       </ScrollView>
 
       {/* Modal selector de tipo (Android / fallback) */}
-      <Modal visible={typePickerOpen} animationType="fade" transparent onRequestClose={() => setTypePickerOpen(false)}>
+      <Modal visible={typePickerOpen} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setTypePickerOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setTypePickerOpen(false)}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Filtrar por tipo</Text>
@@ -528,7 +528,7 @@ export default function RestaurantDetail() {
       </Modal>
 
       {/* Modal alérgenos */}
-      <Modal visible={allergenOpen} animationType="fade" transparent onRequestClose={() => setAllergenOpen(false)}>
+      <Modal visible={allergenOpen} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setAllergenOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setAllergenOpen(false)}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Alérgenos</Text>
@@ -639,9 +639,10 @@ const styles = StyleSheet.create({
   // Modales
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   modalCard: { width: '100%', maxWidth: 420, borderRadius: 16, backgroundColor: '#E9D5FF', padding: 16, borderWidth: 1, borderColor: Colors.border },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: Colors.text, marginBottom: 10 },
-  modalItem: { paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  modalItemText: { fontSize: 16, color: '#E9D5FF' },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: Colors.pillText, marginBottom: 10 },
+  modalItem: { paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth,
+  borderBottomColor: Colors.border, },
+  modalItemText: { fontSize: 16, color: Colors.pillText },
   allergenWrap: {
   flexDirection: 'row',
   flexWrap: 'wrap',
