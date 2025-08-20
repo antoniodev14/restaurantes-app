@@ -2,6 +2,7 @@
 // It accepts optional labels for the open and closed states to support localisation.
 
 import { Restaurant } from '@/libs/restaurants';
+import { Ionicons } from '@expo/vector-icons';
 import { memo, useMemo, useState } from 'react';
 import {
   Image,
@@ -23,6 +24,8 @@ type Props = {
   openLabel?: string;
   /** Text shown when the restaurant is closed. Defaults to Spanish. */
   closedLabel?: string;
+  /** If true, show an edit icon instead of a chevron. */
+  editable?: boolean;
 };
 
 // Colour palette used for the placeholder thumbnails.  The hash of the
@@ -47,7 +50,7 @@ function usePlaceholderColor(name: string) {
  * Base component that renders the card.  It is wrapped with React.memo at
  * export time to avoid unnecessary re-renders when props have not changed.
  */
-function CardBase({ item, pressed = false, openLabel = 'Abierto ahora', closedLabel = 'Cerrado' }: Props) {
+function CardBase({ item, pressed = false, openLabel = 'Abierto ahora', closedLabel = 'Cerrado', editable = false }: Props) {
   const [imgOk, setImgOk] = useState(true);
   const hasImage = !!item?.image_url && imgOk;
 
@@ -67,38 +70,42 @@ function CardBase({ item, pressed = false, openLabel = 'Abierto ahora', closedLa
   const placeholderBg = usePlaceholderColor(item.name);
   const placeholderInitial = (item.name?.trim()?.[0] || '?').toUpperCase();
 
-  return (
-    <View style={[v.card, pressed && v.cardPressed]}>
-      {/* Thumbnail */}
-      <View style={v.thumbBox}>
-        {hasImage ? (
-          <Image
-            source={{ uri: item.image_url! }}
-            style={[i.thumb, i.thumbRound]}
-            resizeMode="cover"
-            onError={() => setImgOk(false)}
-          />
-        ) : (
-          <View style={[i.thumb, i.thumbRound, { backgroundColor: placeholderBg, justifyContent: 'center', alignItems: 'center' }]}> 
-            <Text style={t.placeholderInitial}>{placeholderInitial}</Text>
+      return (
+        <View style={[v.card, pressed && v.cardPressed]}>
+          {/* Thumbnail */}
+          <View style={v.thumbBox}>
+            {hasImage ? (
+              <Image
+                source={{ uri: item.image_url! }}
+                style={[i.thumb, i.thumbRound]}
+                resizeMode="cover"
+                onError={() => setImgOk(false)}
+              />
+            ) : (
+              <View style={[i.thumb, i.thumbRound, { backgroundColor: placeholderBg, justifyContent: 'center', alignItems: 'center' }]}> 
+                <Text style={t.placeholderInitial}>{placeholderInitial}</Text>
+              </View>
+            )}
           </View>
-        )}
-      </View>
-      {/* Information */}
-      <View style={v.info}>
-        <Text style={t.name}>{item.name}</Text>
-        <Text style={t.meta}>{metaText}</Text>
-        {!!cityText && <Text style={t.city}>{cityText}</Text>}
-        {item.is_open != null && (
-          <Text style={[t.badge, { color: item.is_open ? '#059669' : '#dc2626' }]}> 
-            {item.is_open ? openLabel : closedLabel}
-          </Text>
-        )}
-      </View>
-      {/* Chevron indicating navigable card */}
-      <Text style={t.chevron}>›</Text>
-    </View>
-  );
+          {/* Information */}
+          <View style={v.info}>
+            <Text style={t.name}>{item.name}</Text>
+            <Text style={t.meta}>{metaText}</Text>
+            {!!cityText && <Text style={t.city}>{cityText}</Text>}
+            {item.is_open != null && (
+              <Text style={[t.badge, { color: item.is_open ? '#059669' : '#dc2626' }]}> 
+                {item.is_open ? openLabel : closedLabel}
+              </Text>
+            )}
+          </View>
+          {/* Chevron indicating navigable card or edit icon */}
+          {editable ? (
+            <Ionicons name="pencil" size={22} color={Colors.chevron} style={{ marginLeft: 4 }} />
+          ) : (
+            <Text style={t.chevron}>›</Text>
+          )}
+        </View>
+      );
 }
 
 export const RestaurantCard = memo(CardBase);
@@ -137,14 +144,12 @@ const v = StyleSheet.create<{
     default: {},
   })!,
   info: { flex: 1, minWidth: 0 },
-  // eliminamos el backgroundColor y añadimos overflow para recortar
-  thumbBox: { width: 64, height: 64, overflow: 'hidden' },
+  thumbBox: { width: 64, height: 64, overflow: "hidden" },
   thumbRound: { borderRadius: 32 },
 });
 
 const i = StyleSheet.create<{ thumb: ImageStyle; thumbRound: ImageStyle }>({
-  // eliminamos el backgroundColor y añadimos overflow para recortar
-  thumb: { width: 64, height: 64, overflow: 'hidden' },
+  thumb: { width: 64, height: 64, overflow: 'hidden', },
   thumbRound: { borderRadius: 32 },
 });
 
