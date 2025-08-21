@@ -163,6 +163,7 @@ export default function RestaurantDetail() {
   }, [id]);
 
   // ---------- helpers ----------
+  const isPhoneLike = editField === 'phone' || editField === 'whatsapp';
   const firstOf = (v?: string[] | string | null) => Array.isArray(v) ? (v.find(Boolean) ?? '') + '' : (v ?? '') + '';
   const joinAll  = (v?: string[] | string | null) =>
     Array.isArray(v) ? v.filter(Boolean).join(', ') : (v ?? '') + '';
@@ -338,12 +339,14 @@ export default function RestaurantDetail() {
     try {
       setSaving(true);
       const update: any = { [editField]: editValue };
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('restaurants')
         .update(update)
-        .eq('id', data.id);
-      if (error) throw error;
-      setData(prev => (prev ? { ...prev, ...update } : prev));
+        .eq('id', data.id)
+        .select()
+        .maybeSingle();
+      if (error || !updated) throw error || new Error('No autorizado');
+      setData(prev => (prev ? { ...prev, ...updated } : prev));
       setEditField(null);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'No se pudo guardar');
