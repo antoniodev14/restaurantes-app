@@ -13,7 +13,8 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View,
+  TextInput,
+  View
 } from 'react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,7 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/Colors';
 import { resolveImageUrl } from '../../libs/media';
 import type { Restaurant } from '../../libs/restaurants';
-import { supabase } from '../../libs/superbase';
+import { supabase, supabasePublic } from '../../libs/superbase';
 
 /** Tipos */
 type Schedule = { day: number; open: string; close: string };
@@ -62,15 +63,37 @@ export default function RestaurantDetail() {
   const [allergenOpen, setAllergenOpen] = useState(false);
   const [allergenItem, setAllergenItem] = useState<MenuItem | null>(null);
 
+  const [userId, setUserId] = useState<string | null>(null);
+  const [editField, setEditField] = useState<null | 'description' | 'phone' | 'whatsapp' | 'pago'>(null);
+  const [editValue, setEditValue] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const isOwner = useMemo(() => userId != null && (data as any)?.owner_id === userId, [userId, data]);
+
+  const fieldLabels: Record<'description' | 'phone' | 'whatsapp' | 'pago', string> = {
+    description: 'Descripción',
+    phone: 'Teléfono',
+    whatsapp: 'WhatsApp',
+    pago: 'Método de pago',
+  };
+
+
   // Integración barra inferior Android
   useEffect(() => {
     NavigationBar.setBackgroundColorAsync(Colors.gradTo).catch(() => {});
     NavigationBar.setButtonStyleAsync('light').catch(() => {});
   }, []);
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null);
+    });
+  }, []);
+
+
   // ------- Fetch principal -------
   const selectCols =
-    'id,name,types,price_range,phone,whatsapp,address,city,image_url,photo_url,lat,lng,description,web,pago,menu_type_order';
+    'id,name,types,price_range,phone,whatsapp,address,city,image_url,photo_url,lat,lng,description,web,pago,menu_type_order,owner_id';
 
   useEffect(() => {
     let alive = true;
@@ -106,7 +129,7 @@ export default function RestaurantDetail() {
         if (eRls) throw eRls;
 
         // menu_items
-        const { data: mis, error: eMi } = await supabase
+        const { data: mis, error: eMi } = await supabasePublic
           .from('menu_items')
           .select('id,restaurant_id,name,description,price,image_url,allergens,type,sort_index,is_active')
           .eq('restaurant_id', rid)
@@ -304,7 +327,30 @@ export default function RestaurantDetail() {
     if (!/^https?:\/\//i.test(url)) url = looksLikeDomain ? `https://${url}` : '';
     if (url) Linking.openURL(url);
   };
-  const openAllergens = (item: MenuItem) => { setAllergenItem(item); setAllergenOpen(true); };
+
+ const openEdit = (field: 'description' | 'phone' | 'whatsapp' | 'pago') => {
+    if (!data) return;
+    setEditField(field);
+    setEditValue(((data as any)[field] ?? '') as string);
+  };
+  const saveEdit = async () => {
+    if (!data || !editField) return;
+    try {
+      setSaving(true);
+      const update: any = { [editField]: editValue };
+      const { error } = await supabase
+        .from('restaurants')
+        .update(update)
+        .eq('id', data.id);
+      if (error) throw error;
+      setData(prev => (prev ? { ...prev, ...update } : prev));
+      setEditField(null);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'No se pudo guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const fmtPrice = (n?: number | null) => (typeof n === 'number')
     ? new Intl.NumberFormat('es-ES',{ style:'currency', currency:'EUR' }).format(n)
@@ -379,33 +425,50 @@ export default function RestaurantDetail() {
           {/* Botones */}
           <View style={styles.oButtonRow}>
             <Pressable
-              onPress={hasPhone ? openPhone : undefined}
-              disabled={!hasPhone}
-              style={[styles.oButton, !hasPhone && styles.oButtonDisabled]}
+              onPress={isOwner ? () => openEdit('phone') : hasPhone ? openPhone : undefined}
+              disabled={!isOwner && !hasPhone}
+              style={[styles.oButton, !(isOwner || hasPhone) && styles.oButtonDisabled]}
               hitSlop={8}
             >
-              <Ionicons name="call-outline" size={18} color={hasPhone ? Colors.text : '#bbb'} />
-              <Text style={[styles.oButtonText, !hasPhone && styles.oButtonTextDisabled]}>Llamar</Text>
+              <Ionicons name="call-outline" size={18} color={isOwner || hasPhone ? Colors.text : '#bbb'} />
+              <Text style={[styles.oButtonText, !(isOwner || hasPhone) && styles.oButtonTextDisabled]}>
+                {isOwner ? 'Editar llamar' : 'Llamar'}
+              </Text>
             </Pressable>
 
             <Pressable
-              onPress={hasWA ? openWhatsApp : undefined}
-              disabled={!hasWA}
-              style={[styles.oButton, !hasWA && styles.oButtonDisabled]}
+              onPress={isOwner ? () => openEdit('whatsapp') : hasWA ? openWhatsApp : undefined}
+              disabled={!isOwner && !hasWA}
+              style={[styles.oButton, !(isOwner || hasWA) && styles.oButtonDisabled]}
               hitSlop={8}
             >
-              <Ionicons name="logo-whatsapp" size={18} color={hasWA ? '#25D366' : '#bbb'} />
-              <Text style={[styles.oButtonText, !hasWA && styles.oButtonTextDisabled]}>WhatsApp</Text>
+               <Ionicons name="logo-whatsapp" size={18} color={isOwner || hasWA ? '#25D366' : '#bbb'} />
+              <Text style={[styles.oButtonText, !(isOwner || hasWA) && styles.oButtonTextDisabled]}>
+                {isOwner ? 'Editar WhatsApp' : 'WhatsApp'}
+              </Text>
             </Pressable>
           </View>
 
           {/* Descripción */}
           {data.description ? (
-            <View style={{ marginTop: 4, marginBottom: 10 }}>
+            <Pressable
+              onPress={isOwner ? () => openEdit('description') : undefined}
+              style={{ marginTop: 4, marginBottom: 10 }}
+            >
               <Text style={styles.oTitle}>Descripción</Text>
               <Text style={styles.oText}>{data.description}</Text>
-            </View>
-          ) : null}
+            </Pressable>
+          ) : (
+            isOwner ? (
+              <Pressable
+                onPress={() => openEdit('description')}
+                style={{ marginTop: 4, marginBottom: 10 }}
+              >
+                <Text style={styles.oTitle}>Descripción</Text>
+                <Text style={[styles.oText, styles.oButtonTextDisabled]}>Añadir descripción</Text>
+              </Pressable>
+            ) : null
+          )}
 
           {/* Información */}
           <View style={{ marginTop: 4 }}>
@@ -419,11 +482,22 @@ export default function RestaurantDetail() {
             ) : null}
 
             {(data as any).pago ? (
-              <View style={styles.oRow}>
+              <Pressable
+                onPress={isOwner ? () => openEdit('pago') : undefined}
+                style={styles.oRow}
+                hitSlop={6}
+              >
                 <Ionicons name="pricetag-outline" size={18} color="#fff" />
                 <Text style={styles.oText}>{(data as any).pago}</Text>
-              </View>
-            ) : null}
+              </Pressable>
+            ) : (
+              isOwner ? (
+                <Pressable onPress={() => openEdit('pago')} style={styles.oRow} hitSlop={6}>
+                  <Ionicons name="pricetag-outline" size={18} color="#fff" />
+                  <Text style={[styles.oText, styles.oButtonTextDisabled]}>Añadir método de pago</Text>
+                </Pressable>
+              ) : null
+            )}
 
             {(data as any).web ? (
               <Pressable onPress={openWeb} style={styles.oRow} hitSlop={6}>
@@ -551,6 +625,28 @@ export default function RestaurantDetail() {
           </View>
         </Pressable>
       </Modal>
+       {/* Modal edición de campos */}
+      <Modal visible={!!editField} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setEditField(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setEditField(null)}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Editar {editField ? fieldLabels[editField] : ''}</Text>
+            <TextInput
+              value={editValue}
+              onChangeText={setEditValue}
+              multiline={editField === 'description'}
+              style={[styles.modalInput, editField === 'description' && { height: 100, textAlignVertical: 'top' }]}
+            />
+            <View style={styles.modalBtnRow}>
+              <Pressable onPress={() => setEditField(null)} style={styles.modalBtn}>
+                <Text style={styles.modalBtnText}>Cancelar</Text>
+              </Pressable>
+              <Pressable onPress={saveEdit} style={styles.modalBtn} disabled={saving}>
+                {saving ? <ActivityIndicator /> : <Text style={styles.modalBtnText}>Guardar</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -664,6 +760,17 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontWeight: '600',
   },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 8,
+    color: Colors.text,
+  },
+  modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 12 },
+  modalBtn: { backgroundColor: Colors.gradFrom, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  modalBtnText: { color: '#fff', fontWeight: '700' },
 
   // Back
   backBtn: {

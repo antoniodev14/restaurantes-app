@@ -15,3 +15,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: { persistSession: false },
 });
+
+// Public client without auth headers, useful for fetching data that should be
+// accessible even when the user is logged in (RLS policies may restrict the
+// authenticated role).
+export const supabasePublic = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+export { supabaseAnonKey, supabaseUrl };
