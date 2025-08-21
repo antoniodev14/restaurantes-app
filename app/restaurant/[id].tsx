@@ -64,13 +64,18 @@ export default function RestaurantDetail() {
   const [allergenItem, setAllergenItem] = useState<MenuItem | null>(null);
 
   const [userId, setUserId] = useState<string | null>(null);
-  const [editField, setEditField] = useState<null | 'description' | 'phone' | 'whatsapp' | 'pago'>(null);
+  const [editField, setEditField] = useState<null | 'name' | 'description' | 'phone' | 'whatsapp' | 'pago'>(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [scheduleModal, setScheduleModal] = useState(false);
+  const [scheduleDraft, setScheduleDraft] = useState<Record<number, { open: string; close: string }>>({});
 
-  const isOwner = useMemo(() => userId != null && (data as any)?.owner_id === userId, [userId, data]);
-
-  const fieldLabels: Record<'description' | 'phone' | 'whatsapp' | 'pago', string> = {
+const isOwner = useMemo(
+    () => userId != null && String((data as any)?.owner_id ?? '') === userId,
+    [userId, data]
+  );
+  const fieldLabels: Record<'name' | 'description' | 'phone' | 'whatsapp' | 'pago', string> = {
+    name: 'Nombre',
     description: 'Descripción',
     phone: 'Teléfono',
     whatsapp: 'WhatsApp',
@@ -329,7 +334,7 @@ export default function RestaurantDetail() {
     if (url) Linking.openURL(url);
   };
 
- const openEdit = (field: 'description' | 'phone' | 'whatsapp' | 'pago') => {
+ const openEdit = (field: 'name' | 'description' | 'phone' | 'whatsapp' | 'pago') => {
     if (!data) return;
     setEditField(field);
     setEditValue(((data as any)[field] ?? '') as string);
@@ -350,6 +355,34 @@ export default function RestaurantDetail() {
       setEditField(null);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'No se pudo guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openScheduleEdit = () => {
+    const draft: Record<number, { open: string; close: string }> = {};
+    for (const s of schedules) draft[s.day] = { open: s.open, close: s.close };
+    setScheduleDraft(draft);
+    setScheduleModal(true);
+  };
+  const saveSchedule = async () => {
+    if (!data) return;
+    try {
+      setSaving(true);
+      const rows = Object.entries(scheduleDraft)
+        .filter(([, v]) => v.open && v.close)
+        .map(([day, v]) => ({ restaurant_id: data.id, day: Number(day), open: v.open, close: v.close }));
+      const { error: delErr } = await supabase.from('schedules').delete().eq('restaurant_id', data.id);
+      if (delErr) throw delErr;
+      if (rows.length) {
+        const { error: insErr } = await supabase.from('schedules').insert(rows);
+        if (insErr) throw insErr;
+      }
+      setSchedules(rows.map(r => ({ day: r.day, open: r.open, close: r.close })));
+      setScheduleModal(false);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'No se pudo guardar horario');
     } finally {
       setSaving(false);
     }
@@ -418,7 +451,9 @@ export default function RestaurantDetail() {
           )}
           <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.bannerOverlay} />
           <View style={[styles.bannerTitleBox, { paddingBottom: 14 + Math.max(0, insets.top / 3) }]}>
-            <Text style={styles.bannerName} numberOfLines={1}>{data.name}</Text>
+            <Pressable onPress={isOwner ? () => openEdit('name') : undefined}>
+              <Text style={styles.bannerName} numberOfLines={1}>{data.name}</Text>
+            </Pressable>
             {!!typeLabel && <Text style={styles.bannerType} numberOfLines={1}>{typeLabel}</Text>}
           </View>
         </View>
@@ -510,11 +545,26 @@ export default function RestaurantDetail() {
             ) : null}
 
             {showSchedule ? (
-              <View style={[styles.oRow, { alignItems: 'flex-start' }]}>
+              <Pressable
+                onPress={isOwner ? openScheduleEdit : undefined}
+                style={[styles.oRow, { alignItems: 'flex-start' }]}
+                hitSlop={6}
+              >
                 <Ionicons name="calendar-outline" size={18} color="#fff" />
                 <Text style={[styles.oText, { flex: 1, lineHeight: 20 }]}>{openingCompact}</Text>
-              </View>
-            ) : null}
+              </Pressable>
+            ) : (
+              isOwner ? (
+                <Pressable
+                  onPress={openScheduleEdit}
+                  style={[styles.oRow, { alignItems: 'flex-start' }]}
+                  hitSlop={6}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#fff" />
+                  <Text style={[styles.oText, styles.oButtonTextDisabled]}>Añadir horario</Text>
+                </Pressable>
+              ) : null
+            )}
           </View>
         </View>
         {/* ====== /SECCIÓN NARANJA ====== */}
@@ -628,8 +678,44 @@ export default function RestaurantDetail() {
           </View>
         </Pressable>
       </Modal>
-       {/* Modal edición de campos */}
-      <Modal visible={!!editField} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setEditField(null)}>
+        {/* Modal edición horario */}
+        <Modal visible={scheduleModal} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setScheduleModal(false)}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setScheduleModal(false)}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Editar horario</Text>
+              {[1,2,3,4,5,6,7].map(d => (
+                <View key={d} style={styles.scheduleRow}>
+                  <Text style={styles.scheduleDay}>{dayAbbr(d)}</Text>
+                  <TextInput
+                    value={scheduleDraft[d]?.open ?? ''}
+                    onChangeText={t => setScheduleDraft(p => ({ ...p, [d]: { ...(p[d] || {}), open: t } }))}
+                    placeholder="08:00"
+                    keyboardType="numbers-and-punctuation"
+                    style={styles.scheduleInput}
+                  />
+                  <Text style={styles.scheduleSep}>-</Text>
+                  <TextInput
+                    value={scheduleDraft[d]?.close ?? ''}
+                    onChangeText={t => setScheduleDraft(p => ({ ...p, [d]: { ...(p[d] || {}), close: t } }))}
+                    placeholder="23:00"
+                    keyboardType="numbers-and-punctuation"
+                    style={styles.scheduleInput}
+                  />
+                </View>
+              ))}
+              <View style={styles.modalBtnRow}>
+                <Pressable onPress={() => setScheduleModal(false)} style={styles.modalBtn}>
+                  <Text style={styles.modalBtnText}>Cancelar</Text>
+                </Pressable>
+                <Pressable onPress={saveSchedule} style={styles.modalBtn} disabled={saving}>
+                  {saving ? <ActivityIndicator /> : <Text style={styles.modalBtnText}>Guardar</Text>}
+                </Pressable>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+         {/* Modal edición de campos */}
+        <Modal visible={!!editField} animationType="fade" transparent statusBarTranslucent onRequestClose={() => setEditField(null)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setEditField(null)}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Editar {editField ? fieldLabels[editField] : ''}</Text>
@@ -637,6 +723,7 @@ export default function RestaurantDetail() {
               value={editValue}
               onChangeText={setEditValue}
               multiline={editField === 'description'}
+              keyboardType={editField === 'phone' || editField === 'whatsapp' ? 'number-pad' : 'default'}
               style={[styles.modalInput, editField === 'description' && { height: 100, textAlignVertical: 'top' }]}
             />
             <View style={styles.modalBtnRow}>
@@ -771,6 +858,20 @@ const styles = StyleSheet.create({
     padding: 8,
     color: Colors.text,
   },
+  scheduleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  scheduleDay: { width: 28, color: Colors.text },
+  scheduleInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  scheduleSep: { color: Colors.text },
   modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 12 },
   modalBtn: { backgroundColor: Colors.gradFrom, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   modalBtnText: { color: '#fff', fontWeight: '700' },
